@@ -1,0 +1,36 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Lista de correos con permiso de administrador — solo ellos pueden
+    // dar de alta o quitar gente de la colección authorizedUsers.
+    function esAdmin() {
+      return request.auth != null &&
+        request.auth.token.email in ['luisbrito2000@gmail.com'];
+    }
+
+    // Un usuario autorizado es un documento cuyo ID es su propio UID.
+    // - Cualquier usuario logueado puede leer SOLO su propio documento
+    //   (para saber si está autorizado a usar la herramienta).
+    // - Solo el/los admin(es) pueden crear, modificar o borrar documentos
+    //   de esta colección (o sea, dar de alta o quitar gente).
+    match /authorizedUsers/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if esAdmin();
+    }
+
+    // Solicitudes de acceso (login con Google de alguien aún no autorizado):
+    // - La propia persona puede crear/actualizar SOLO su propia solicitud.
+    // - Solo el/los admin(es) pueden ver la lista completa y borrarlas (al aprobar).
+    match /accessRequests/{uid} {
+      allow create, update: if request.auth != null && request.auth.uid == uid;
+      allow read, delete: if esAdmin();
+    }
+
+    // Todo lo demás, cerrado por defecto.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

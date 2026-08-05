@@ -1,0 +1,17 @@
+{
+  "firestore": {
+    "database": "(default)",
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "firestore.rules",
+      "cf-worker/**",
+      "**/.*",
+      "**/node_modules/**",
+      "*.backup-*.html"
+    ]
+  }
+}
