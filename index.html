@@ -210,7 +210,7 @@
         const db = firebase.firestore();
 
         // Correos con permiso para dar de alta usuarios nuevos (debe coincidir con firestore.rules)
-        const ADMIN_EMAILS = ['luisbrito2000@gmail.com'];
+        const ADMIN_EMAILS = ['luisbrito2000@gmail.com', 'labm_1993@outlook.com'];
 
         const PantallaLogin = () => {
             const [email, setEmail] = useState('');
@@ -461,6 +461,9 @@
                 return auth.onAuthStateChanged(async (u) => {
                     setUser(u);
                     if (!u) { setAuthorized(null); return; }
+                    // Los admins (ADMIN_EMAILS) siempre pasan — así siempre hay forma de
+                    // entrar a aprobar gente aunque nadie los haya dado de alta todavía.
+                    if (ADMIN_EMAILS.includes(u.email)) { setAuthorized(true); return; }
                     setAuthorized(null);
                     try {
                         const doc = await db.collection('authorizedUsers').doc(u.uid).get();
