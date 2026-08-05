@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cimiento Solar - Calculador Balastrado Completo</title>
+    <!-- Tailwind CSS para Diseño de Interfaz Industrial -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React y ReactDOM para Renderizado Reactivo en Milisegundos -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    <!-- Babel para Compilación al Vuelo en el Navegador -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Generación de PDF -->
+    <script src="https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <style>
+        /* Desactivar scroll global para emular entorno de software nativo */
+        body { margin: 0; padding: 0; overflow: hidden; }
+        /* Ocultar barras de scroll estéticas pero mantener funcionalidad */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        html.tema-claro { filter: invert(1) hue-rotate(180deg); }
+        html.tema-claro img { filter: invert(1) hue-rotate(180deg); }
+
+        /* Textura de celdas de silicio fotovoltaico realista */
+        .solar-grid-pattern {
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.08) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.08) 1px, transparent 1px);
+            background-size: 25% 50%;
+        }
+
+        :root {
+            --bal-bg: #08111f;
+            --bal-panel: #101a2b;
+            --bal-panel-strong: #0d1626;
+            --bal-border: rgba(148, 163, 184, 0.20);
+            --bal-accent: #38bdf8;
+            --bal-good: #34d399;
+            --bal-warn: #fbbf24;
+        }
+
+        body {
+            background:
+                radial-gradient(circle at 72% 8%, rgba(56, 189, 248, 0.12), transparent 28%),
+                linear-gradient(180deg, #0b1424 0%, var(--bal-bg) 100%);
+        }
+
+        input,
+        button,
+        a {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        input:focus-visible,
+        button:focus-visible,
+        a:focus-visible {
+            outline: 3px solid rgba(56, 189, 248, 0.32);
+            outline-offset: 2px;
+        }
+
+        input[type="number"] {
+            border-radius: 8px;
+            transition: border-color 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease;
+        }
+
+        input[type="number"]:focus {
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.14);
+        }
+
+        .bg-slate-900,
+        .bg-slate-950\/40,
+        .bg-slate-900\/50,
+        .bg-slate-900\/95 {
+            border-color: var(--bal-border);
+        }
+
+        .shadow-2xl {
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+        }
+
+        .rounded-2xl {
+            border-radius: 16px;
+        }
+
+        .rounded-xl {
+            border-radius: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .h-16 {
+                min-height: 72px;
+                height: auto;
+                gap: 12px;
+                padding-top: 10px;
+                padding-bottom: 10px;
+                flex-wrap: wrap;
+            }
+
+            .absolute.top-4.left-6 {
+                left: 12px;
+                right: 12px;
+                top: 12px;
+                width: auto;
+                overflow-x: auto;
+            }
+
+            .absolute.bottom-6.right-6 {
+                right: 12px;
+                bottom: 12px;
+                transform: scale(0.9);
+                transform-origin: bottom right;
+            }
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function App() {
+            // ESTADOS DE CONTROL DE PROYECTO GLOBAL
+            const [panelesHelioscope, setPanelesHelioscope] = useState(10);
+            const [rows, setRows] = useState(5);
+            const [cols, setCols] = useState(2);
+            const [zoom, setZoom] = useState(100);
+            const [usaPowerGrip, setUsaPowerGrip] = useState(true);
+            const [usaMidSupport, setUsaMidSupport] = useState(false);
+            
+            // Inicializar la cuadrícula de datos base de 50x50 llena de 1s (paneles activos)
+            const [matriz, setMatriz] = useState(() => {
+                const initialGrid = Array(50).fill(null).map(() => Array(50).fill(0));
+                // Inicializar por defecto un arreglo de 5x2 de 1s para que coincida con image_f860f9.png
+                for(let r=0; r<5; r++) {
+                    for(let c=0; c<2; c++) {
+                        initialGrid[r][c] = 1;
+                    }
+                }
+                return initialGrid;
+            });
+
+            // Estados operativos para el arrastre selectivo del mouse (Drag-to-select)
+            const [isMouseDown, setIsMouseDown] = useState(false);
+            const [drawMode, setDrawMode] = useState(null); // 1: Encender panel, 0: Vaciar celda
+
+            // Control de vista móvil (Alternar entre 'lienzo' y 'bom')
+            const [vistaMovil, setVistaMovil] = useState('lienzo');
+
+            // Contenedor del BOM Consolidado Final de Almacén
+            const [bom, setBom] = useState({
+                activos: 0, north: 0, rm10: 0, clips: 0, tornillos: 0, midSupports: 0, omgs: 0, blocks: 0
+            });
+
+            const [isDark, setIsDark] = useState(true);
+            useEffect(() => {
+                document.documentElement.classList.toggle('tema-claro', !isDark);
+                return () => document.documentElement.classList.remove('tema-claro');
+            }, [isDark]);
+
+            // SELECCIÓN DE HERRAMIENTA ACTIVA (DIBUJO VS MOVER)
+            const [activeTool, setActiveTool] = useState('dibujo'); // 'dibujo' o 'mover'
+
+            // ESTADOS DE NAVEGACIÓN INFINITA EN 2D (PANNING ESTILO CAD DE ALTA VELOCIDAD)
+            const canvasContainerRef = useRef(null);
+            const transformLayerRef = useRef(null);
+            const [panX, setPanX] = useState(150); // Desplazamiento inicial X
+            const [panY, setPanY] = useState(100); // Desplazamiento inicial Y
+            const [isSpacePressed, setIsSpacePressed] = useState(false);
+            const [isPanning, setIsPanning] = useState(false);
+
+            // Refs de alta precisión para evitar re-renderizados pesados de React durante el arrastre
+            const navRef = useRef({
+                x: 150,
+                y: 100,
+                zoom: 100,
+                isDragging: false,
+                startX: 0,
+                startY: 0,
+                originX: 150,
+                originY: 100
+            });
+
+            // Sincronizar cambios de posición desde botones o controles externos al Ref Navegador
+            useEffect(() => {
+                navRef.current.x = panX;
+                navRef.current.y = panY;
+                applyTransform();
+            }, [panX, panY]);
+
+            useEffect(() => {
+                navRef.current.zoom = zoom;
+                applyTransform();
+            }, [zoom]);
+
+            // Función rígida de actualización de transformación en el DOM
+            const applyTransform = () => {
+                if (transformLayerRef.current) {
+                    transformLayerRef.current.style.transform = `translate(${navRef.current.x}px, ${navRef.current.y}px) scale(${navRef.current.zoom / 100})`;
+                }
+            };
+
+            // Escucha global de la tecla Espacio para habilitar la manita de agarre de inmediato
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.code === 'Space' && document.activeElement.tagName !== 'INPUT') {
+                        e.preventDefault();
+                        setIsSpacePressed(true);
+                    }
+                };
+
+                const handleKeyUp = (e) => {
+                    if (e.code === 'Space') {
+                        setIsSpacePressed(false);
+                    }
+                };
+
+                window.addEventListener('keydown', handleKeyDown);
+                window.addEventListener('keyup', handleKeyUp);
+                return () => {
+                    window.removeEventListener('keydown', handleKeyDown);
+                    window.removeEventListener('keyup', handleKeyUp);
+                };
+            }, []);
+
+            // Escucha de la rueda del mouse para Zoom suave sobre el plano infinito (Hasta 500%)
+            useEffect(() => {
+                const container = canvasContainerRef.current;
+                if (!container) return;
+
+                const handleWheel = (e) => {
+                    e.preventDefault();
+                    // Modificador de zoom suave basado en scroll (Rango: 15% - 500%)
+                    const delta = e.deltaY < 0 ? 8 : -8;
+                    const nextZoom = Math.min(500, Math.max(15, navRef.current.zoom + delta));
+                    setZoom(nextZoom);
+                };
+
+                container.addEventListener('wheel', handleWheel, { passive: false });
+                return () => {
+                    container.removeEventListener('wheel', handleWheel);
+                };
+            }, []);
+
+            // Escuchas globales en el documento para garantizar un arrastre fluido de paneo
+            useEffect(() => {
+                const handleGlobalMouseMove = (e) => {
+                    if (!navRef.current.isDragging) return;
+                    e.preventDefault();
+                    const dx = e.clientX - navRef.current.startX;
+                    const dy = e.clientY - navRef.current.startY;
+                    
+                    navRef.current.x = navRef.current.originX + dx;
+                    navRef.current.y = navRef.current.originY + dy;
+                    applyTransform();
+                };
+
+                const handleGlobalMouseUp = () => {
+                    if (navRef.current.isDragging) {
+                        navRef.current.isDragging = false;
+                        setPanX(navRef.current.x);
+                        setPanY(navRef.current.y);
+                        setIsPanning(false);
+                    }
+                };
+
+                window.addEventListener('mousemove', handleGlobalMouseMove);
+                window.addEventListener('mouseup', handleGlobalMouseUp);
+
+                return () => {
+                    window.removeEventListener('mousemove', handleGlobalMouseMove);
+                    window.removeEventListener('mouseup', handleGlobalMouseUp);
+                };
+            }, []);
+
+            // MOTOR DE CÁLCULO ESTRUCTURAL BALASTRADO (BARRIDO DE ABAJO HACIA ARRIBA BASADO EN NODOS DE SOPORTE)
+            useEffect(() => {
+                let activos = 0;
+                let north = 0;
+                let rm10 = 0;
+                let blocks = 0;
+                let omgs = 0;
+
+                // 1. Contar paneles activos en el arreglo
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        if (matriz[r][c] === 1) {
+                            activos++;
+                        }
+                    }
+                }
+
+                // 2. Escaneo bidimensional de nodos de soporte (y de 0 a Rows, x de 0 a Cols)
+                // Esta es la física real del racking Unirac EVO en Landscape
+                for (let y = 0; y <= rows; y++) {
+                    for (let x = 0; x <= cols; x++) {
+                        // Comprobar si hay un panel activo inmediatamente arriba/norte de este nodo de soporte
+                        const hasAbove = (y > 0) && (
+                            (x > 0 && matriz[y - 1][x - 1] === 1) || 
+                            (x < cols && matriz[y - 1][x] === 1)
+                        );
+                        
+                        // Comprobar si hay un panel activo inmediatamente abajo/sur de este nodo de soporte
+                        const hasBelow = (y < rows) && (
+                            (x > 0 && matriz[y][x - 1] === 1) || 
+                            (x < cols && matriz[y][x] === 1)
+                        );
+
+                        // Si el nodo de soporte tiene contacto con al menos un panel activo:
+                        if (hasAbove || hasBelow) {
+                            // Clasificación del tipo de charola soporte:
+                            if (hasBelow && !hasAbove) {
+                                // Soporte de arranque expuesto al Norte -> EVO North
+                                north++;
+                            } else {
+                                // Soporte intermedio o de cierre frontal -> RM10
+                                rm10++;
+                            }
+
+                            // REGLA DE ORO DE PERIFERIA REAL PARA CONCRETO
+                            // Un nodo de soporte está en la periferia si toca el contorno exterior de la mancha activa
+                            const esFilaExtrema = (y === 0 || y === rows);
+                            const esFlancoLateral = (x === 0 || x === cols);
+                            const esContornoReal = esFilaExtrema || esFlancoLateral || (hasBelow !== hasAbove);
+
+                            if (!usaPowerGrip) {
+                                // Sistema puro por gravedad: 3 bloques en periferia, 2 en centro
+                                blocks += esContornoReal ? 3 : 2;
+                            } else {
+                                // Sistema híbrido optimizado: el anclaje reduce la necesidad de peso muerto
+                                blocks += esContornoReal ? 2 : 1;
+                            }
+
+                            // ESCALAMIENTO OPERATIVO DE ANCLAJES OMG POWERGRIP
+                            if (usaPowerGrip) {
+                                if (activos <= 25) {
+                                    // Mancha Chica: Saturación perimetral continua por baja inercia
+                                    if (esContornoReal) omgs++;
+                                } else {
+                                    // Mancha Grande: Esquinas fijas y paso intermitente cada 3 charolas perimetrales
+                                    const esEsquinaAbsoluta = (y === 0 || y === rows) && (x === 0 || x === cols);
+                                    if (esEsquinaAbsoluta) {
+                                        omgs++;
+                                    } else if (esContornoReal && (x % 3 === 0 || y % 3 === 0)) {
+                                        omgs++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Distribución de baja densidad en el núcleo central para manchas grandes (1 cada 4 interiores)
+                if (usaPowerGrip && activos > 25) {
+                    let interiorPanels = 0;
+                    for (let r = 1; r < rows - 1; r++) {
+                        for (let c = 1; c < cols - 1; c++) {
+                            if (matriz[r][c] === 1) {
+                                interiorPanels++;
+                            }
+                        }
+                    }
+                    omgs += Math.floor(interiorPanels / 4);
+                }
+
+                // Multiplicador directo de ferretería fija (Paneles x 4) + Modificador Mid Support
+                let factorTornillos = usaMidSupport ? 6 : 4;
+
+                setBom({
+                    activos,
+                    north,
+                    rm10,
+                    clips: activos * factorTornillos,
+                    tornillos: activos * factorTornillos,
+                    midSupports: usaMidSupport ? activos : 0,
+                    omgs: usaPowerGrip ? omgs : 0,
+                    blocks
+                });
+
+            }, [matriz, rows, cols, usaPowerGrip, usaMidSupport]);
+
+            // CONTROLADORES DE EVENTOS DEL MOUSE (DIBUJO VS PANNING INTEGRADO DIRECTO)
+            const handleCellMouseDown = (r, c, valorActual, e) => {
+                const esClickMedio = e.button === 1;
+                const esModoMover = activeTool === 'mover';
+                
+                // Si la barra espaciadora está presionada o el modo actual es Mover, iniciamos Paneo directo sobre el panel
+                if (isSpacePressed || esModoMover || esClickMedio) {
+                    e.preventDefault();
+                    navRef.current.isDragging = true;
+                    navRef.current.startX = e.clientX;
+                    navRef.current.startY = e.clientY;
+                    navRef.current.originX = panX;
+                    navRef.current.originY = panY;
+                    setIsPanning(true);
+                    return;
+                }
+
+                setIsMouseDown(true);
+                const modoObjetivo = valorActual === 1 ? 0 : 1;
+                setDrawMode(modoObjetivo);
+                
+                const nuevaMatriz = matriz.map(rowArr => [...rowArr]);
+                nuevaMatriz[r][c] = modoObjetivo;
+                setMatriz(nuevaMatriz);
+            };
+
+            const handleCellMouseEnter = (r, c) => {
+                // Evitamos pintar si estamos paneando o en modo navegación
+                if (!isMouseDown || isSpacePressed || activeTool === 'mover' || navRef.current.isDragging) return;
+                const nuevaMatriz = matriz.map(rowArr => [...rowArr]);
+                nuevaMatriz[r][c] = drawMode;
+                setMatriz(nuevaMatriz);
+            };
+
+            const handleMouseUpGlobal = () => {
+                setIsMouseDown(false);
+                setDrawMode(null);
+                setIsPanning(false);
+            };
+
+            // INICIO DE MANEO DE PANTALLA (PANNING DESDE EL FONDO DE PUNTOS)
+            const handleCanvasMouseDown = (e) => {
+                const esClickMedio = e.button === 1;
+                const esModoMover = activeTool === 'mover';
+                
+                if (isSpacePressed || esClickMedio || esModoMover) {
+                    e.preventDefault();
+                    navRef.current.isDragging = true;
+                    navRef.current.startX = e.clientX;
+                    navRef.current.startY = e.clientY;
+                    navRef.current.originX = panX;
+                    navRef.current.originY = panY;
+                    setIsPanning(true);
+                }
+            };
+
+            // SOPORTE DE PANEO TÁCTIL PARA TABLETS Y DISPOSITIVOS MÓVILES (NATIVO EN PANELES)
+            const handleCanvasTouchStart = (e) => {
+                if (activeTool === 'mover' || isSpacePressed || e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    navRef.current.isDragging = true;
+                    navRef.current.startX = touch.clientX;
+                    navRef.current.startY = touch.clientY;
+                    navRef.current.originX = panX;
+                    navRef.current.originY = panY;
+                    setIsPanning(true);
+                }
+            };
+
+            const handleCanvasTouchMove = (e) => {
+                if (!navRef.current.isDragging || e.touches.length > 1) return;
+                const touch = e.touches[0];
+                const dx = touch.clientX - navRef.current.startX;
+                const dy = touch.clientY - navRef.current.startY;
+                setPanX(navRef.current.originX + dx);
+                setPanY(navRef.current.originY + dy);
+            };
+
+            const handleCellTouchStart = (r, c, e) => {
+                // Si está activa la manita, iniciamos paneo desde el panel en móvil
+                if (activeTool === 'mover' || isSpacePressed) {
+                    const touch = e.touches[0];
+                    navRef.current.isDragging = true;
+                    navRef.current.startX = touch.clientX;
+                    navRef.current.startY = touch.clientY;
+                    navRef.current.originX = panX;
+                    navRef.current.originY = panY;
+                    setIsPanning(true);
+                }
+            };
+
+            const alternarLienzoCompleto = (estado) => {
+                setMatriz(Array(50).fill(null).map(() => Array(50).fill(estado)));
+            };
+
+            // Dirección del D-pad de la consola CAD
+            const navegarConDPad = (direccion) => {
+                const paso = 120; // píxeles de desplazamiento
+                if (direccion === 'arriba') { setPanY(prev => prev + paso); navRef.current.y += paso; }
+                if (direccion === 'abajo') { setPanY(prev => prev - paso); navRef.current.y -= paso; }
+                if (direccion === 'izquierda') { setPanX(prev => prev + paso); navRef.current.x += paso; }
+                if (direccion === 'derecha') { setPanX(prev => prev - paso); navRef.current.x -= paso; }
+                if (direccion === 'home') {
+                    setPanX(150);
+                    setPanY(100);
+                    setZoom(100);
+                    navRef.current.x = 150;
+                    navRef.current.y = 100;
+                    navRef.current.zoom = 100;
+                }
+            };
+
+            // Definición de colores dinámicos del semáforo de validación
+            const validacionSemafórica = bom.activos === panelesHelioscope 
+                ? { color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30', msg: `🟢 Conteo Perfecto: La rejilla coincide con HelioScope. BOM Liberado.` }
+                : bom.activos > panelesHelioscope 
+                    ? { color: 'bg-rose-500/10 text-rose-400 border-rose-500/30', msg: `🚨 Sobrediseño: Tienes ${bom.activos - panelesHelioscope} paneles excedentes en la rejilla.` }
+                    : { color: 'bg-amber-500/10 text-amber-400 border-amber-500/30', msg: `⚠️ Discrepancia: Faltan asignar ${panelesHelioscope - bom.activos} paneles en el mapa.` };
+
+            const exportarBomPdf = async () => {
+                const reportElement = document.getElementById('pdfReportBalastrado');
+                if (!reportElement) return;
+
+                const orig = {
+                    position: reportElement.style.position,
+                    left: reportElement.style.left,
+                    top: reportElement.style.top,
+                    visibility: reportElement.style.visibility,
+                    zIndex: reportElement.style.zIndex
+                };
+
+                reportElement.style.position = 'fixed';
+                reportElement.style.left = '0';
+                reportElement.style.top = '0';
+                reportElement.style.visibility = 'visible';
+                reportElement.style.zIndex = '99999';
+
+                try {
+                    const logoImg = reportElement.querySelector('#pdfLogoBal');
+                    if (logoImg) {
+                        try {
+                            const resp = await fetch('https://raw.githubusercontent.com/gavainc/Cimiento-Solar/main/Logo%20Cimiento%20Solar.png');
+                            if (resp.ok) {
+                                const blob = await resp.blob();
+                                const dataUrl = await new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
+                                logoImg.src = dataUrl;
+                                await new Promise(res => { logoImg.onload = res; logoImg.onerror = res; });
+                            }
+                        } catch(_) {}
+                    }
+
+                    const canvas = await window.html2canvas(reportElement, {
+                        scale: 1,
+                        useCORS: true,
+                        backgroundColor: '#ffffff',
+                        logging: false
+                    });
+
+                    const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+                    const pageW = pdf.internal.pageSize.getWidth();
+                    const pageH = pdf.internal.pageSize.getHeight();
+                    const marginX = 10, marginY = 10;
+                    const imgW = pageW - 2 * marginX;
+                    const imgH = (canvas.height / canvas.width) * imgW;
+                    const maxH = pageH - 2 * marginY;
+                    const finalH = Math.min(imgH, maxH);
+                    const finalW = imgH > maxH ? imgW * (maxH / imgH) : imgW;
+
+                    pdf.addImage(canvas.toDataURL('image/png'), 'PNG', marginX, marginY, finalW, finalH);
+                    pdf.save(`reporte-balastrado-${new Date().toISOString().slice(0, 10)}.pdf`);
+                } catch(error) {
+                    alert('Error generando el PDF: ' + error.message);
+                } finally {
+                    Object.assign(reportElement.style, orig);
+                }
+            };
+
+            // METRICAS DE GEOMETRIA FIJA CALCULADA PARA EL CONTENEDOR CONTRA OVERLAP
+            const gridWidth = cols * 96 + (cols - 1) * 16 + 64; 
+            const gridHeight = rows * 48 + (rows - 1) * 20 + 64;
+
+            // Determinar cursor dinámico del lienzo
+            let cursorLienzo = 'default';
+            const isNavigationActive = isSpacePressed || activeTool === 'mover';
+            if (isNavigationActive) {
+                cursorLienzo = isPanning ? 'grabbing' : 'grab';
+            } else if (isPanning) {
+                cursorLienzo = 'grabbing';
+            }
+
+            return (
+                <div className="flex h-screen w-screen overflow-hidden select-none flex-col md:flex-row bg-slate-950 text-slate-100" onMouseUp={handleMouseUpGlobal}>
+                    
+                    {/* ENCABEZADO RESPONSIVO */}
+                    <div className="md:hidden flex items-center justify-between p-4 bg-slate-900 border-b border-slate-800 z-20">
+                        <div className="flex items-center gap-2">
+                            <div className="w-2 h-5 bg-sky-500 rounded-sm"></div>
+                            <span className="font-black text-sm tracking-wide text-sky-400">CIMIENTO SOLAR</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setIsDark(!isDark)}
+                                className="w-8 h-8 flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 transition-colors text-sm"
+                            >
+                                {isDark ? '☀️' : '🌙'}
+                            </button>
+                            <a href="portada.html" className="flex items-center gap-1 px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-sky-400 bg-slate-800 hover:bg-slate-700 rounded-md transition-colors">
+                                &#8592; Inicio
+                            </a>
+                        </div>
+                    </div>
+
+                    {/* REBANADA IZQUIERDA: CONFIGURACIÓN GLOBAL Y BOM INDUSTRIAL */}
+                    <div className={`w-full md:w-[420px] bg-slate-900 border-r border-slate-800 flex flex-col h-full z-10 shadow-2xl ${vistaMovil === 'lienzo' ? 'hidden md:flex' : 'flex'}`}>
+                        
+                        {/* HEADER LOGO (DESKTOP) */}
+                        <div className="hidden md:flex p-5 border-b border-slate-800 bg-slate-950/40 items-center justify-between">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <div className="w-2.5 h-6 bg-sky-500 rounded-sm"></div>
+                                    <h1 className="text-lg font-black text-sky-400 tracking-wider">CIMIENTO SOLAR</h1>
+                                </div>
+                                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">CALCULADOR BALASTRADO v3.0</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => setIsDark(!isDark)}
+                                    className="w-8 h-8 flex items-center justify-center rounded-md bg-slate-800 hover:bg-slate-700 transition-colors text-sm"
+                                    title={isDark ? 'Cambiar a modo claro' : 'Cambiar a modo oscuro'}
+                                >
+                                    {isDark ? '☀️' : '🌙'}
+                                </button>
+                                <a href="portada.html" className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-slate-400 hover:text-sky-400 bg-slate-800 hover:bg-slate-700 rounded-md transition-colors">
+                                    &#8592; Inicio
+                                </a>
+                            </div>
+                        </div>
+
+                        {/* PANEL DE ENTRADAS PARÁMETRICAS */}
+                        <div className="p-5 border-b border-slate-800 space-y-4 bg-slate-900/50">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1.5">Paneles Objetivo (HelioScope)</label>
+                                <input 
+                                    type="number" 
+                                    value={panelesHelioscope} 
+                                    onChange={e => setPanelesHelioscope(parseInt(e.target.value) || 0)} 
+                                    className="w-full bg-slate-950 border border-slate-700 rounded p-2.5 font-mono text-sm focus:outline-none focus:border-sky-500 text-sky-400 font-black tracking-tight shadow-inner" 
+                                />
+                            </div>
+                            
+                            {/* INTERRUPTORES DE COMPONENTES MÁSTERS */}
+                            <div className="space-y-3 pt-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-300">Asistencia OMG PowerGrip</span>
+                                    <button onClick={() => setUsaPowerGrip(!usaPowerGrip)} className={`w-11 h-6 rounded-full transition-colors relative p-1 ${usaPowerGrip ? 'bg-sky-500' : 'bg-slate-700'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${usaPowerGrip ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                    </button>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-300">Soporte Panel Largo (Mid Support)</span>
+                                    <button onClick={() => setUsaMidSupport(!usaMidSupport)} className={`w-11 h-6 rounded-full transition-colors relative p-1 ${usaMidSupport ? 'bg-sky-500' : 'bg-slate-700'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full transition-transform ${usaMidSupport ? 'translate-x-5' : 'translate-x-0'}`}></div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* EXPLOSIÓN NETA DE MATERIALES (BOM INDUSTRIAL) */}
+                        <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
+                            <h2 className="text-[10px] font-black text-slate-400 tracking-widest uppercase border-b border-slate-800 pb-1.5">BOM de Surtido de Almacén</h2>
+                            
+                            <div className="space-y-2 font-mono text-xs">
+                                <div className="flex justify-between p-2.5 bg-slate-950/60 rounded border border-slate-800">
+                                    <span className="text-slate-400">Charolas EVO North:</span>
+                                    <span className="text-emerald-400 font-black">{bom.north} Pzas</span>
+                                </div>
+                                <div className="flex justify-between p-2.5 bg-slate-950/60 rounded border border-slate-800">
+                                    <span className="text-slate-400">Charolas RM10:</span>
+                                    <span className="text-emerald-400 font-black">{bom.rm10} Pzas</span>
+                                </div>
+                                <div className="flex justify-between p-2.5 bg-slate-950/60 rounded border border-slate-800">
+                                    <span className="text-slate-400">Clips de Fijación:</span>
+                                    <span className="text-amber-400 font-black">{bom.clips} Pzas</span>
+                                </div>
+                                <div className="flex justify-between p-2.5 bg-slate-950/60 rounded border border-slate-800">
+                                    <span className="text-slate-400">Tornillos Especiales:</span>
+                                    <span className="text-amber-400 font-black">{bom.tornillos} Pzas</span>
+                                </div>
+                                {usaMidSupport && (
+                                    <div className="flex justify-between p-2.5 bg-sky-950/30 rounded border border-sky-900/50">
+                                        <span className="text-sky-400">Herrajes Mid Support:</span>
+                                        <span className="text-sky-300 font-black">{bom.midSupports} Pzas</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* TARJETA LOGÍSTICA DE CONCRETO Y CONTRA-PESOS SUGERIDOS */}
+                            <div className="p-4 bg-slate-950/90 rounded-lg border border-slate-800 space-y-2.5 shadow-inner">
+                                <h3 className="text-[10px] font-black text-sky-400 tracking-wider uppercase">Valores Sugeridos Preliminares</h3>
+                                <div className="flex justify-between text-xs font-mono">
+                                    <span className="text-slate-400">Anclajes Mecánicos OMG:</span>
+                                    <span className="text-white font-black">{bom.omgs} Pzas</span>
+                                </div>
+                                <div className="flex justify-between text-xs font-mono">
+                                    <span className="text-slate-400">Bloques de Concreto:</span>
+                                    <span className="text-white font-black">{bom.blocks} Pzas</span>
+                                </div>
+                            </div>
+
+                            {/* ESCUDO DE RESPONSABILIDAD TÉCNICA */}
+                            <div className="p-3 bg-slate-950/40 rounded border border-slate-800/60 text-[9px] text-slate-500 leading-tight text-justify">
+                                ⚠️ <strong>Deslinde de Responsabilidad:</strong> Los valores de bloques y anclajes OMG son estimaciones logísticas sugeridas basadas en promedios de obra. Es obligación confirmar estas cantidades con el reporte final oficial U-Builder de Unirac y la firma del perito calculista.
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* REBANADA DERECHA: LIENZO GRÁFICO INTERACTIVO DE DISEÑO */}
+                    <div className={`flex-1 flex flex-col h-full relative bg-slate-950 ${vistaMovil === 'bom' ? 'hidden md:flex' : 'flex'}`}>
+                        
+                        {/* BARRA DE ACCIÓN Y CONTROLADORES DE MATRIZ DE DIMENSIONES */}
+                        <div className="h-16 border-b border-slate-800 bg-slate-900 flex items-center justify-between px-6 z-10 shadow-md">
+                            <div className="flex items-center gap-4">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest hidden lg:block">Dimensiones del Arreglo</span>
+                                
+                                {/* CONTROL DE FILAS (REDISEÑADO CON + Y - PERFECTAMENTE SEPARADOS Y VISIBLES) */}
+                                <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden text-xs font-mono">
+                                    <span className="px-2.5 text-slate-400 text-[10px] font-black uppercase">Filas:</span>
+                                    <button 
+                                        onClick={() => setRows(Math.max(1, rows - 1))} 
+                                        className="w-8 h-8 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-slate-300 font-black border-l border-slate-700 active:bg-slate-950 transition-colors"
+                                        title="Reducir Filas"
+                                    >
+                                        -
+                                    </button>
+                                    <span className="w-12 text-center text-sky-400 font-black text-sm">{rows}</span>
+                                    <button 
+                                        onClick={() => setRows(Math.min(50, rows + 1))} 
+                                        className="w-8 h-8 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-slate-300 font-black border-l border-slate-700 active:bg-slate-950 transition-colors"
+                                        title="Aumentar Filas"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+
+                                {/* CONTROL DE COLUMNAS (REDISEÑADO CON + Y - PERFECTAMENTE SEPARADOS Y VISIBLES) */}
+                                <div className="flex items-center bg-slate-950 rounded-lg border border-slate-700 overflow-hidden text-xs font-mono">
+                                    <span className="px-2.5 text-slate-400 text-[10px] font-black uppercase">Cols:</span>
+                                    <button 
+                                        onClick={() => setCols(Math.max(1, cols - 1))} 
+                                        className="w-8 h-8 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-slate-300 font-black border-l border-slate-700 active:bg-slate-950 transition-colors"
+                                        title="Reducir Columnas"
+                                    >
+                                        -
+                                    </button>
+                                    <span className="w-12 text-center text-sky-400 font-black text-sm">{cols}</span>
+                                    <button 
+                                        onClick={() => setCols(Math.min(50, cols + 1))} 
+                                        className="w-8 h-8 flex items-center justify-center bg-slate-900 hover:bg-slate-800 text-slate-300 font-black border-l border-slate-700 active:bg-slate-950 transition-colors"
+                                        title="Aumentar Columnas"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* CONTROLES DE ESCALA (ZOOM / PAN) */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex items-center bg-slate-950 rounded border border-slate-700 p-1 text-xs font-bold">
+                                    <button onClick={() => setZoom(Math.max(15, zoom - 10))} className="w-6 h-6 flex items-center justify-center hover:bg-slate-800 rounded font-black text-sm">-</button>
+                                    <span className="px-3 font-mono text-slate-400 text-xs">{zoom}%</span>
+                                    <button onClick={() => setZoom(Math.min(500, zoom + 10))} className="w-6 h-6 flex items-center justify-center hover:bg-slate-800 rounded font-black text-sm">+</button>
+                                </div>
+                                <div className="h-6 w-px bg-slate-800 hidden md:block"></div>
+                                <div className="hidden md:flex gap-1.5">
+                                    <button onClick={() => alternarLienzoCompleto(0)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-black uppercase rounded tracking-wider transition-colors">Vaciar Todo</button>
+                                    <button onClick={() => alternarLienzoCompleto(1)} className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[10px] font-black uppercase rounded tracking-wider transition-colors">Llenar Todo</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* CONTENEDOR DEL LIENZO DE DIBUJO CON SOPORTE DE NAVEGACIÓN INFINITO Y CONTROL MOUSE COMPLETO CONTRA OVERLAP */}
+                        <div 
+                            ref={canvasContainerRef}
+                            onMouseDown={handleCanvasMouseDown}
+                            onTouchStart={handleCanvasTouchStart}
+                            onTouchMove={handleCanvasTouchMove}
+                            onTouchEnd={() => setIsPanning(false)}
+                            style={{ cursor: cursorLienzo }}
+                            className="flex-1 overflow-hidden p-12 bg-[radial-gradient(#334155_1.5px,transparent_1.5px)] [background-size:24px_24px] relative animate-fade-in"
+                        >
+                            {/* BARRA DE HERRAMIENTAS FLOTANTE DEL LIENZO (SELECTOR DE MODOS CAD) */}
+                            <div className="absolute top-4 left-6 bg-slate-900/95 border border-slate-800 px-3 py-2 rounded-xl shadow-2xl z-20 flex items-center gap-3">
+                                <div className="flex items-center gap-1">
+                                    <button 
+                                        onClick={() => setActiveTool('dibujo')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${activeTool === 'dibujo' && !isSpacePressed ? 'bg-sky-500 text-slate-950 shadow' : 'text-slate-400 hover:bg-slate-800'}`}
+                                        title="Dibujar o borrar paneles individuales"
+                                    >
+                                        <span>✏️</span>
+                                        <span>Dibujar</span>
+                                    </button>
+                                    <button 
+                                        onClick={() => setActiveTool('mover')}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${(activeTool === 'mover' || isSpacePressed) ? 'bg-sky-500 text-slate-950 shadow' : 'text-slate-400 hover:bg-slate-800'}`}
+                                        title="Navegar por el lienzo infinito"
+                                    >
+                                        <span>🖐️</span>
+                                        <span>Desplazar</span>
+                                    </button>
+                                </div>
+                                <div className="h-5 w-px bg-slate-800"></div>
+                                <div className="text-[9px] text-slate-500 leading-tight hidden lg:block">
+                                    <span>Tip: Presiona <strong>[Espacio]</strong> o arrastra con la rueda del scroll para moverte. Zoom hasta <strong>500%</strong>.</span>
+                                </div>
+                            </div>
+
+                            {/* CONSOLA DE DIRECCIONES CAD (D-PAD) SÚPER COMPLETA EN LA ESQUINA INFERIOR DERECHA */}
+                            <div className="absolute bottom-6 right-6 bg-slate-900/95 border border-slate-800 p-4 rounded-2xl shadow-2xl z-20 flex flex-col items-center gap-3 w-40 animate-slide-in">
+                                <span className="text-[9px] font-black text-slate-500 tracking-wider uppercase leading-none">Navegación CAD</span>
+                                
+                                {/* EL D-PAD DIRECCIONAL */}
+                                <div className="grid grid-cols-3 gap-1 w-24 h-24 relative">
+                                    <div></div>
+                                    <button 
+                                        onClick={() => navegarConDPad('arriba')} 
+                                        className="bg-slate-800 hover:bg-slate-700 active:bg-slate-950 rounded-lg flex items-center justify-center font-bold text-sm border border-slate-700 shadow"
+                                        title="Mover arriba"
+                                    >
+                                        ▲
+                                    </button>
+                                    <div></div>
+                                    
+                                    <button 
+                                        onClick={() => navegarConDPad('izquierda')} 
+                                        className="bg-slate-800 hover:bg-slate-700 active:bg-slate-950 rounded-lg flex items-center justify-center font-bold text-sm border border-slate-700 shadow"
+                                        title="Mover izquierda"
+                                    >
+                                        ◀
+                                    </button>
+                                    <button 
+                                        onClick={() => navegarConDPad('home')} 
+                                        className="bg-sky-950/40 hover:bg-sky-900/40 active:bg-slate-950 rounded-lg flex items-center justify-center text-xs font-black border border-sky-800 text-sky-400 shadow"
+                                        title="Recenter vista (Home)"
+                                    >
+                                        🎯
+                                    </button>
+                                    <button 
+                                        onClick={() => navegarConDPad('derecha')} 
+                                        className="bg-slate-800 hover:bg-slate-700 active:bg-slate-950 rounded-lg flex items-center justify-center font-bold text-sm border border-slate-700 shadow"
+                                        title="Mover derecha"
+                                    >
+                                        ▶
+                                    </button>
+                                    
+                                    <div></div>
+                                    <button 
+                                        onClick={() => navegarConDPad('abajo')} 
+                                        className="bg-slate-800 hover:bg-slate-700 active:bg-slate-950 rounded-lg flex items-center justify-center font-bold text-sm border border-slate-700 shadow"
+                                        title="Mover abajo"
+                                    >
+                                        ▼
+                                    </button>
+                                    <div></div>
+                                </div>
+
+                                {/* CONTROLES DE ZOOM EN LA CONSOLA */}
+                                <div className="flex w-full items-center justify-between border-t border-slate-800/80 pt-2.5 mt-0.5">
+                                    <button 
+                                        onClick={() => setZoom(Math.max(15, zoom - 10))}
+                                        className="bg-slate-800 hover:bg-slate-700 active:bg-slate-950 w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs border border-slate-700"
+                                    >
+                                        -
+                                    </button>
+                                    <span className="font-mono text-[10px] text-slate-400 font-bold">{zoom}%</span>
+                                    <button 
+                                        onClick={() => setZoom(Math.min(500, zoom + 10))}
+                                        className="bg-slate-800 hover:bg-slate-700 active:bg-slate-950 w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs border border-slate-700"
+                                    >
+                                        +
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* TRANSFORMACIÓN DEL CANVAS - TRANSLACIÓN Y ZOOM INFINITO REAL SIN RESTRICCIONES DE ANCHO */}
+                            <div 
+                                ref={transformLayerRef}
+                                className="absolute origin-top-left shrink-0"
+                                style={{
+                                    transform: `translate(${panX}px, ${panY}px) scale(${zoom / 100})`,
+                                    width: 'max-content',
+                                    height: 'max-content'
+                                }}
+                            >
+                                {/* LA MESA DE DIBUJO RÍGIDA FILA POR FILA CON FLEXBOX - SOLUCIÓN DEFINITIVA A LA COMPRESIÓN DE image_f42b5f.png, image_f7d93e.png y image_f7d99c.png */}
+                                <div 
+                                    style={{
+                                        width: 'max-content',
+                                        minWidth: 'max-content',
+                                        height: 'max-content',
+                                        minHeight: 'max-content',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                        gap: '20px'
+                                    }}
+                                    className="bg-slate-900/40 p-8 rounded-2xl border border-slate-800 shadow-2xl shrink-0"
+                                >
+                                    {matriz.slice(0, rows).map((rowArr, rowIndex) => (
+                                        <div 
+                                            key={rowIndex} 
+                                            className="flex flex-row shrink-0"
+                                            style={{ 
+                                                width: 'max-content', 
+                                                minWidth: 'max-content',
+                                                flexWrap: 'nowrap',
+                                                gap: '16px'
+                                            }}
+                                        >
+                                            {rowArr.slice(0, cols).map((val, colIndex) => {
+                                                // 1. EVALUAR EN TIEMPO REAL SI EL SOPORTE ES PERIFERIA EN BASE A LA REGLA DE ORE
+                                                // Un panel es periférico si toca el contorno o flancos exteriores de su bloque activo de manera horizontal o vertical
+                                                const esFilaExtrema = (rowIndex === 0 || rowIndex === rows - 1);
+                                                const primerActivoFila = rowArr.slice(0, cols).indexOf(1);
+                                                const ultimoActivoFila = rowArr.slice(0, cols).lastIndexOf(1);
+                                                const esFlancoLateral = (colIndex === primerActivoFila || colIndex === ultimoActivoFila);
+                                                const esPeriferia = val === 1 && (esFilaExtrema || (esFlancoLateral && primerActivoFila !== -1));
+
+                                                // Cursor dinámico por celda
+                                                const cursorCelda = isNavigationActive ? (isPanning ? 'grabbing' : 'grab') : 'pointer';
+
+                                                return (
+                                                    <div
+                                                        key={`${rowIndex}-${colIndex}`}
+                                                        onMouseDown={(e) => handleCellMouseDown(rowIndex, colIndex, val, e)}
+                                                        onMouseEnter={() => handleCellMouseEnter(rowIndex, colIndex)}
+                                                        onTouchStart={(e) => handleCellTouchStart(rowIndex, colIndex, e)}
+                                                        // Bloqueo rigido absoluto de ancho y alto con shrink-0. Físicamente imposible que se vuelvan cuadrados o se encima
+                                                        style={{ 
+                                                            width: '96px', 
+                                                            minWidth: '96px', 
+                                                            maxWidth: '96px', 
+                                                            height: '48px', 
+                                                            minHeight: '48px', 
+                                                            maxHeight: '48px',
+                                                            cursor: cursorCelda,
+                                                            flexShrink: 0
+                                                        }}
+                                                        className={`rounded-lg relative overflow-hidden transition-all duration-100 flex flex-col items-center justify-between p-2 font-mono text-[8px] font-black select-none shrink-0 ${
+                                                            val === 1 
+                                                                ? esPeriferia
+                                                                    ? 'bg-gradient-to-br from-sky-950 to-slate-900 text-sky-200 border-amber-500 shadow-lg shadow-sky-950/40 ring-1 ring-amber-500/20'
+                                                                    : 'bg-gradient-to-br from-sky-900 to-slate-900 text-sky-100 border-sky-400 shadow-lg shadow-sky-950/40 ring-1 ring-sky-400/20' 
+                                                                : 'bg-slate-950/85 text-slate-700 border-slate-900 border-dashed hover:border-slate-800 hover:bg-slate-900/30'
+                                                        }`}
+                                                    >
+                                                        {/* Textura de celdas de silicio fotovoltaico realista (Solo si el panel está encendido) */}
+                                                        {val === 1 && <div className="absolute inset-0 solar-grid-pattern pointer-events-none opacity-40"></div>}
+                                                        
+                                                        {/* Coordenada */}
+                                                        <div className={`relative z-10 w-full text-left leading-none ${val === 1 ? 'text-sky-300 font-extrabold text-[9px]' : 'text-slate-700'}`}>
+                                                            {rowIndex + 1},{colIndex + 1}
+                                                        </div>
+                                                        
+                                                        {/* Indicador de Tipo de Soporte / Bloques sin contacto ni overlap de texto */}
+                                                        <div className="relative z-10 w-full flex justify-between items-center leading-none mt-1">
+                                                            <span className={`px-1 py-0.5 rounded text-[7px] ${val === 1 ? (esPeriferia ? 'bg-amber-500/20 text-amber-300' : 'bg-sky-500/20 text-sky-300') : 'text-slate-800 bg-transparent'}`}>
+                                                                {val === 1 ? (esPeriferia ? 'PER' : 'INT') : 'Ø'}
+                                                            </span>
+                                                            <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${val === 1 ? (esPeriferia ? 'bg-amber-500 text-slate-950 font-black shadow' : 'bg-sky-500/20 text-sky-400') : 'hidden'}`}>
+                                                                {val === 1 ? (esPeriferia ? '3B' : '2B') : ''}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {}
+                        {/* BARRA DE CONTROL INFERIOR FIJA: VALIDACIÓN ESTRICTA Y CANDADO DE LOGÍSTICA */}
+                        <div className="h-20 border-t border-slate-800 bg-slate-900 flex items-center justify-between px-6 z-10 shadow-2xl">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Progreso de Cuadre Real</span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="text-2xl font-black font-mono tracking-tight text-white">{bom.activos}</span>
+                                    <span className="text-slate-600 font-bold text-sm">/</span>
+                                    <span className="text-slate-400 font-bold font-mono text-sm">{panelesHelioscope} Módulos</span>
+                                </div>
+                            </div>
+
+                            {/* SEMÁFORO DINÁMICO REACTIVO */}
+                            <div className={`px-4 py-2.5 rounded-lg border text-xs font-bold ${validacionSemafórica.color} max-w-xl flex-1 mx-6 text-center shadow-inner transition-all duration-200 hidden lg:block`}>
+                                {validacionSemafórica.msg}
+                            </div>
+
+                            {/* EL BOTÓN CON CANDADO DE CIERRE (HARD STOP) */}
+                            <button
+                                onClick={exportarBomPdf}
+                                disabled={bom.activos !== panelesHelioscope}
+                                className={`px-6 py-3 rounded-lg font-black text-xs uppercase tracking-wider transition-all shadow-md ${
+                                    bom.activos === panelesHelioscope
+                                        ? 'bg-sky-500 hover:bg-sky-600 text-slate-950 cursor-pointer active:scale-95'
+                                        : 'bg-slate-800 text-slate-600 border border-slate-700 cursor-not-allowed'
+                                }`}
+                            >
+                                Exportar BOM PDF
+                            </button>
+                        </div>
+
+                    </div>
+
+                    {/* BOTONES ADAPTIVOS PARA CAMBIO DE VISTA EN MÓVILES */}
+                    <div className="md:hidden h-14 border-t border-slate-800 bg-slate-900 flex items-center justify-around z-20">
+                        <button
+                            onClick={() => setVistaMovil('lienzo')}
+                            className={`flex flex-col items-center justify-center w-1/2 h-full text-xs font-bold transition-colors ${vistaMovil === 'lienzo' ? 'text-sky-400 bg-slate-950/40' : 'text-slate-400'}`}
+                        >
+                            <span className="text-base mb-0.5">🗺️</span>
+                            Plano / Lienzo
+                        </button>
+                        <button
+                            onClick={() => setVistaMovil('bom')}
+                            className={`flex flex-col items-center justify-center w-1/2 h-full text-xs font-bold transition-colors ${vistaMovil === 'bom' ? 'text-sky-400 bg-slate-950/40' : 'text-slate-400'}`}
+                        >
+                            <span className="text-base mb-0.5">📦</span>
+                            BOM / Almacén
+                        </button>
+                    </div>
+
+                    {/* REPORTE PDF OCULTO — SOLO BOM */}
+                    <div id="pdfReportBalastrado" style={{position:'absolute',left:'-9999px',top:'0',width:'800px',background:'#ffffff',color:'#111827',visibility:'hidden',fontFamily:'system-ui,-apple-system,sans-serif'}}>
+                        {/* Header */}
+                        <div style={{background:'#ffffff',borderBottom:'4px solid #003B5C',padding:'20px 32px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <div style={{display:'flex',alignItems:'center',gap:'16px'}}>
+                                <img id="pdfLogoBal" src="https://raw.githubusercontent.com/gavainc/Cimiento-Solar/main/Logo%20Cimiento%20Solar.png" crossOrigin="anonymous" alt="Cimiento Solar" style={{height:'56px'}} onError={e => { e.target.style.display='none'; e.target.nextElementSibling.style.display='flex'; }} />
+                                <div style={{display:'none',flexDirection:'column'}}>
+                                    <span style={{fontSize:'20px',fontWeight:900,color:'#003B5C',letterSpacing:'0.06em'}}>CIMIENTO SOLAR</span>
+                                    <span style={{fontSize:'10px',fontWeight:600,color:'#64748B',letterSpacing:'0.18em',textTransform:'uppercase'}}>Cuenta Contigo</span>
+                                </div>
+                            </div>
+                            <div style={{textAlign:'right'}}>
+                                <div style={{fontSize:'10px',fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.12em'}}>Reporte de Materiales</div>
+                                <div style={{fontSize:'18px',fontWeight:900,color:'#003B5C'}}>Sistema Balastrado</div>
+                                <div style={{fontSize:'11px',color:'#64748B'}}>{new Date().toLocaleDateString('es-MX',{year:'numeric',month:'long',day:'numeric'})}</div>
+                            </div>
+                        </div>
+
+                        {/* Info del proyecto */}
+                        <div style={{padding:'14px 32px',background:'#F8FAFC',borderBottom:'1px solid #E2E8F0',display:'flex',gap:'28px',flexWrap:'wrap'}}>
+                            {[
+                                ['Paneles objetivo', panelesHelioscope],
+                                ['Paneles en diseño', bom.activos],
+                                ['OMG PowerGrip', usaPowerGrip ? 'Sí' : 'No'],
+                                ['Mid Support', usaMidSupport ? 'Sí' : 'No'],
+                            ].map(([label,val]) => (
+                                <div key={label} style={{display:'flex',flexDirection:'column',gap:'2px'}}>
+                                    <span style={{fontSize:'9px',fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'0.12em'}}>{label}</span>
+                                    <span style={{fontSize:'14px',fontWeight:900,color:'#003B5C'}}>{val}</span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Tabla BOM */}
+                        <div style={{padding:'24px 32px'}}>
+                            <div style={{fontSize:'11px',fontWeight:900,color:'#003B5C',marginBottom:'12px',textTransform:'uppercase',letterSpacing:'0.12em'}}>Lista de Materiales</div>
+                            <table style={{width:'100%',borderCollapse:'collapse'}}>
+                                <thead>
+                                    <tr style={{background:'#003B5C',color:'#fff'}}>
+                                        <th style={{padding:'10px 16px',textAlign:'left',fontSize:'11px',fontWeight:700}}>Producto</th>
+                                        <th style={{padding:'10px 16px',textAlign:'center',fontSize:'11px',fontWeight:700}}>Cantidad</th>
+                                        <th style={{padding:'10px 16px',textAlign:'left',fontSize:'11px',fontWeight:700}}>Unidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {[
+                                        {label:'Charola EVO North', val:bom.north, alt:false},
+                                        {label:'Charola RM10', val:bom.rm10, alt:true},
+                                        {label:'Clips de Fijación', val:bom.clips, alt:false},
+                                        {label:'Tornillos Especiales', val:bom.tornillos, alt:true},
+                                        ...(usaMidSupport ? [{label:'Herrajes Mid Support', val:bom.midSupports, alt:false}] : []),
+                                    ].map((row,i) => (
+                                        <tr key={i} style={{background: row.alt ? '#F8FAFC' : '#ffffff'}}>
+                                            <td style={{padding:'10px 16px',fontSize:'12px',color:'#374151'}}>{row.label}</td>
+                                            <td style={{padding:'10px 16px',textAlign:'center',fontSize:'15px',fontWeight:900,color:'#003B5C'}}>{row.val}</td>
+                                            <td style={{padding:'10px 16px',fontSize:'12px',color:'#6B7280'}}>Pzas</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Valores sugeridos */}
+                        <div style={{padding:'0 32px 24px'}}>
+                            <div style={{fontSize:'11px',fontWeight:900,color:'#003B5C',marginBottom:'12px',textTransform:'uppercase',letterSpacing:'0.12em'}}>Valores Sugeridos Preliminares</div>
+                            <table style={{width:'100%',borderCollapse:'collapse'}}>
+                                <thead>
+                                    <tr style={{background:'#E0F2FE'}}>
+                                        <th style={{padding:'10px 16px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#0369A1'}}>Concepto</th>
+                                        <th style={{padding:'10px 16px',textAlign:'center',fontSize:'11px',fontWeight:700,color:'#0369A1'}}>Cantidad</th>
+                                        <th style={{padding:'10px 16px',textAlign:'left',fontSize:'11px',fontWeight:700,color:'#0369A1'}}>Unidad</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style={{background:'#F0F9FF'}}>
+                                        <td style={{padding:'10px 16px',fontSize:'12px',color:'#374151'}}>Anclajes Mecánicos OMG</td>
+                                        <td style={{padding:'10px 16px',textAlign:'center',fontSize:'15px',fontWeight:900,color:'#0369A1'}}>{bom.omgs}</td>
+                                        <td style={{padding:'10px 16px',fontSize:'12px',color:'#6B7280'}}>Pzas</td>
+                                    </tr>
+                                    <tr>
+                                        <td style={{padding:'10px 16px',fontSize:'12px',color:'#374151'}}>Bloques de Concreto</td>
+                                        <td style={{padding:'10px 16px',textAlign:'center',fontSize:'15px',fontWeight:900,color:'#0369A1'}}>{bom.blocks}</td>
+                                        <td style={{padding:'10px 16px',fontSize:'12px',color:'#6B7280'}}>Pzas</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Deslinde */}
+                        <div style={{padding:'0 32px 24px'}}>
+                            <div style={{padding:'12px 16px',background:'#FEFCE8',border:'1px solid #FDE047',borderRadius:'6px',fontSize:'10px',color:'#713F12',lineHeight:'1.6'}}>
+                                ⚠️ <strong>Deslinde de Responsabilidad:</strong> Los valores de bloques y anclajes OMG son estimaciones logísticas sugeridas basadas en promedios de obra. Es obligación confirmar estas cantidades con el reporte final oficial U-Builder de Unirac y la firma del perito calculista.
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div style={{background:'#F1F5F9',borderTop:'3px solid #003B5C',padding:'12px 32px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                            <span style={{fontSize:'10px',color:'#64748B',fontWeight:600}}>Cimiento Solar — Sistema Balastrado</span>
+                            <span style={{fontSize:'10px',color:'#64748B'}}>Generado automáticamente</span>
+                        </div>
+                    </div>
+
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
