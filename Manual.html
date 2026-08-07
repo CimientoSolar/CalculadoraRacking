@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cimiento Solar — Manual de Usuario</title>
+<style>
+
+  /* ============ TOKENS ============ */
+  :root{
+    --paper:      #EAEDEC;
+    --paper-raised:#F6F7F6;
+    --ink:        #101A22;
+    --ink-soft:   #3D4A52;
+    --ink-faint:  #6E7B82;
+    --line:       #C7CFCE;
+    --line-soft:  #D9DEDC;
+    --blue:       #0B3049;
+    --blue-soft:  #0E5A80;
+    --amber:      #C97A2B;
+    --amber-soft: #E8A45C;
+    --good:       #2F7D5C;
+    --good-bg:    #E3EFE7;
+    --warn:       #8A5A16;
+    --warn-bg:    #F5E9D3;
+    --danger:     #9A3324;
+    --danger-bg:  #F3E1DC;
+    --code-bg:    #DEE4E2;
+    --shadow:     0 10px 28px rgba(11,48,73,0.10);
+  }
+
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:      #0E161C;
+      --paper-raised:#141F27;
+      --ink:        #E7EDEE;
+      --ink-soft:   #AEBBC1;
+      --ink-faint:  #7C8B92;
+      --line:       #263139;
+      --line-soft:  #1D272E;
+      --blue:       #6FB2D9;
+      --blue-soft:  #9BCBE6;
+      --amber:      #E8A45C;
+      --amber-soft: #C97A2B;
+      --good:       #7BC49B;
+      --good-bg:    #163024;
+      --warn:       #E3BC7A;
+      --warn-bg:    #2E2510;
+      --danger:     #E19585;
+      --danger-bg:  #331C17;
+      --code-bg:    #1B252C;
+      --shadow:     0 10px 28px rgba(0,0,0,0.38);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:      #0E161C;
+    --paper-raised:#141F27;
+    --ink:        #E7EDEE;
+    --ink-soft:   #AEBBC1;
+    --ink-faint:  #7C8B92;
+    --line:       #263139;
+    --line-soft:  #1D272E;
+    --blue:       #6FB2D9;
+    --blue-soft:  #9BCBE6;
+    --amber:      #E8A45C;
+    --amber-soft: #C97A2B;
+    --good:       #7BC49B;
+    --good-bg:    #163024;
+    --warn:       #E3BC7A;
+    --warn-bg:    #2E2510;
+    --danger:     #E19585;
+    --danger-bg:  #331C17;
+    --code-bg:    #1B252C;
+    --shadow:     0 10px 28px rgba(0,0,0,0.38);
+  }
+
+  /* ============ BASE ============ */
+  *,*::before,*::after{ box-sizing:border-box; }
+  html{ -webkit-text-size-adjust:100%; }
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    font-size:16px;
+    line-height:1.6;
+  }
+  ::selection{ background:var(--amber-soft); color:#14202b; }
+
+  h1,h2,h3,h4{
+    font-family: Charter, "Iowan Old Style", "Georgia", "Times New Roman", serif;
+    font-weight:700;
+    color:var(--ink);
+    text-wrap:balance;
+    letter-spacing:-0.005em;
+  }
+
+  code, .mono, .kbd, .tag, table.data{
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  a{ color:var(--blue-soft); }
+
+  img{ max-width:100%; }
+
+  .wrap{
+    max-width:1180px;
+    margin:0 auto;
+    padding: 0 clamp(16px,4vw,40px) 120px;
+  }
+
+  /* ============ MASTHEAD ============ */
+  header.masthead{
+    border-bottom:1px solid var(--line);
+    background:
+      repeating-linear-gradient(90deg, transparent, transparent 39px, var(--line-soft) 39px, var(--line-soft) 40px),
+      var(--paper-raised);
+    padding: clamp(28px,5vw,52px) clamp(16px,4vw,40px) 30px;
+  }
+  .masthead-inner{ max-width:1180px; margin:0 auto; }
+  .back-link{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:12px; font-weight:700; text-decoration:none;
+    color:var(--ink-faint);
+    border:1px solid var(--line); border-radius:6px;
+    padding:6px 11px; margin-bottom:22px;
+    background:var(--paper);
+  }
+  .back-link:hover{ color:var(--ink); border-color:var(--ink-faint); }
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:8px;
+    font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase;
+    color:var(--amber);
+    margin-bottom:14px;
+  }
+  .eyebrow::before{
+    content:""; width:22px; height:2px; background:var(--amber); display:inline-block;
+  }
+  h1.title{
+    font-size: clamp(30px, 4.6vw, 46px);
+    line-height:1.06;
+    margin:0 0 12px;
+  }
+  .subtitle{
+    color:var(--ink-soft);
+    font-size: clamp(14.5px, 1.6vw, 17px);
+    max-width:62ch;
+    margin:0 0 22px;
+  }
+  .meta-row{
+    display:flex; flex-wrap:wrap; gap: 10px 26px;
+    font-size:12.5px; color:var(--ink-faint);
+    border-top:1px solid var(--line); padding-top:16px; margin-top:6px;
+  }
+  .meta-row b{ color:var(--ink-soft); font-weight:700; }
+
+  /* ============ LAYOUT: NAV + CONTENT ============ */
+  .layout{
+    display:grid;
+    grid-template-columns: 236px 1fr;
+    gap: 48px;
+    padding-top: 36px;
+    align-items:start;
+  }
+  @media (max-width: 880px){
+    .layout{ grid-template-columns: 1fr; }
+  }
+
+  nav.toc{
+    position: sticky; top: 20px;
+    font-size:13px;
+    border-left:2px solid var(--line);
+    padding-left:16px;
+  }
+  nav.toc .toc-label{
+    font-size:10.5px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
+    color:var(--ink-faint); margin-bottom:10px;
+  }
+  nav.toc ol{ list-style:none; margin:0; padding:0; counter-reset:tocnum; }
+  nav.toc li{ counter-increment:tocnum; margin-bottom:3px; }
+  nav.toc a{
+    display:flex; gap:8px;
+    text-decoration:none; color:var(--ink-soft);
+    padding:5px 6px; border-radius:4px;
+  }
+  nav.toc a::before{
+    content: counter(tocnum, decimal-leading-zero);
+    color:var(--amber); font-family:"SFMono-Regular",Consolas,monospace; font-size:11px; flex-shrink:0; padding-top:1px;
+  }
+  nav.toc a:hover{ background:var(--paper-raised); color:var(--ink); }
+  @media (max-width: 880px){
+    nav.toc{ position:static; border-left:none; padding-left:0; border-bottom:1px solid var(--line); padding-bottom:18px; }
+    nav.toc ol{ display:flex; flex-wrap:wrap; gap:4px 10px; }
+    nav.toc li{ margin:0; }
+  }
+
+  main{ min-width:0; }
+
+  /* ============ SECTIONS ============ */
+  section.doc-section{
+    padding-top: 8px;
+    margin-bottom: 58px;
+    scroll-margin-top: 20px;
+  }
+  section.doc-section + section.doc-section{
+    border-top:1px solid var(--line);
+    padding-top:48px;
+  }
+  .section-head{
+    display:flex; align-items:center; gap:14px; margin-bottom:6px; flex-wrap:wrap;
+  }
+  .section-num{
+    font-family:"SFMono-Regular",Consolas,monospace;
+    color:var(--amber); font-size:13px; font-weight:700;
+    text-transform:uppercase; letter-spacing:0.06em;
+    background:var(--code-bg); border:1px solid var(--line);
+    border-radius:4px; padding:2px 8px; white-space:nowrap;
+  }
+  h2{ font-size: clamp(22px,2.6vw,28px); margin:0; }
+  .section-kicker{
+    color:var(--ink-faint); font-size:14px; margin: 6px 0 26px; max-width:68ch;
+  }
+
+  h3{ font-size:18px; margin: 30px 0 10px; }
+  h3 .kbd{ font-size:12px; }
+  p{ margin: 0 0 14px; max-width: 72ch; color: var(--ink-soft); }
+  p strong{ color:var(--ink); }
+  ul, ol.steps{ margin:0 0 16px; padding-left:22px; max-width:72ch; color:var(--ink-soft); }
+  li{ margin-bottom:6px; }
+
+  ol.steps{ list-style:none; padding-left:0; counter-reset:step; }
+  ol.steps li{
+    counter-increment:step;
+    position:relative;
+    padding-left:34px;
+    margin-bottom:12px;
+  }
+  ol.steps li::before{
+    content: counter(step);
+    position:absolute; left:0; top:1px;
+    width:22px; height:22px; border-radius:50%;
+    background:var(--paper-raised); border:1px solid var(--line);
+    color:var(--blue-soft); font-family:"SFMono-Regular",Consolas,monospace; font-weight:700; font-size:11px;
+    display:flex; align-items:center; justify-content:center;
+  }
+
+  .tag{
+    display:inline-block; background:var(--code-bg); color:var(--ink);
+    border:1px solid var(--line); border-radius:4px;
+    padding:1px 7px; font-size:12.5px;
+  }
+  .kbd{
+    display:inline-block; background:var(--paper-raised); border:1px solid var(--line);
+    border-bottom-width:2px; border-radius:5px; padding:1px 7px; font-size:12px; color:var(--ink);
+  }
+
+  /* ---- callouts ---- */
+  .callout{
+    border:1px solid var(--line); border-left:3px solid var(--blue-soft);
+    background:var(--paper-raised);
+    border-radius:6px; padding:14px 16px; margin: 18px 0 22px; max-width:72ch;
+  }
+  .callout p{ margin:0; max-width:none; font-size:14.5px; }
+  .callout .callout-label{
+    font-size:10.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase;
+    color:var(--blue-soft); margin-bottom:6px; display:block;
+  }
+  .callout.warn{ border-left-color:var(--warn); background:var(--warn-bg); }
+  .callout.warn .callout-label{ color:var(--warn); }
+  .callout.danger{ border-left-color:var(--danger); background:var(--danger-bg); }
+  .callout.danger .callout-label{ color:var(--danger); }
+  .callout.good{ border-left-color:var(--good); background:var(--good-bg); }
+  .callout.good .callout-label{ color:var(--good); }
+
+  /* ---- feature cards ---- */
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin: 18px 0 24px; }
+  @media (max-width:640px){ .grid-2{ grid-template-columns:1fr; } }
+  .grid-3{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin: 18px 0 24px; }
+  @media (max-width:760px){ .grid-3{ grid-template-columns:1fr 1fr; } }
+  @media (max-width:520px){ .grid-3{ grid-template-columns:1fr; } }
+
+  .card{
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:16px 18px;
+  }
+  .card h4{
+    font-size:14px; margin:0 0 6px;
+    font-family:-apple-system,"Segoe UI",Roboto,system-ui,sans-serif;
+    color:var(--ink); letter-spacing:0.01em;
+  }
+  .card p{ font-size:13.5px; margin:0; max-width:none; }
+
+  /* ---- tables ---- */
+  .table-wrap{ overflow-x:auto; margin: 8px 0 24px; border:1px solid var(--line); border-radius:8px; }
+  table.data{ border-collapse:collapse; width:100%; min-width:520px; font-size:13.5px; }
+  table.data th{
+    text-align:left; background:var(--paper-raised); color:var(--ink-faint);
+    font-weight:700; text-transform:uppercase; letter-spacing:0.06em; font-size:11px;
+    padding:10px 14px; border-bottom:1px solid var(--line);
+  }
+  table.data td{
+    padding:9px 14px; border-bottom:1px solid var(--line-soft); color:var(--ink-soft); vertical-align:top;
+  }
+  table.data tr:last-child td{ border-bottom:none; }
+  table.data td.k{ color:var(--ink); font-weight:600; white-space:nowrap; }
+
+  /* ---- diagram / flow ---- */
+  .flow{
+    display:flex; align-items:stretch; gap:10px; flex-wrap:wrap;
+    margin: 10px 0 26px;
+  }
+  .flow .step{
+    flex:1 1 150px;
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:8px;
+    padding:12px 14px; font-size:13px; color:var(--ink-soft); position:relative;
+  }
+  .flow .step b{ display:block; color:var(--ink); font-size:13.5px; margin-bottom:3px; }
+  .flow .arrow{ align-self:center; color:var(--ink-faint); font-size:16px; }
+  @media (max-width:700px){ .flow{ flex-direction:column; } .flow .arrow{ transform:rotate(90deg); align-self:flex-start; margin-left:14px; } }
+
+  /* ---- toggle switch illustration ---- */
+  .swrow{ display:flex; align-items:center; gap:10px; font-size:13.5px; color:var(--ink-soft); margin-bottom:8px; }
+  .sw{ width:30px; height:17px; border-radius:99px; background:var(--line); position:relative; flex-shrink:0; }
+  .sw.on{ background:var(--blue-soft); }
+  .sw::after{ content:""; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:var(--paper); }
+  .sw.on::after{ left:15px; background:#fff; }
+
+  footer.colophon{
+    border-top:1px solid var(--line);
+    margin-top: 50px; padding-top:24px;
+    font-size:12.5px; color:var(--ink-faint);
+    display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px;
+  }
+
+  @media (prefers-reduced-motion: reduce){ *{ scroll-behavior:auto !important; } }
+  html{ scroll-behavior:smooth; }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <a class="back-link" href="portada.html">&#8592; Volver a la app</a>
+    <div class="eyebrow">Guía paso a paso</div>
+    <h1 class="title">Cómo armar un proyecto en Cimiento Solar</h1>
+    <p class="subtitle">Sigue estos pasos en orden dentro del <strong>Sistema Anclado</strong>, de principio a fin: desde configurar el proyecto hasta exportar el reporte de materiales.</p>
+    <div class="meta-row">
+      <span><b>Aplicación:</b> herramienta web interna (Firebase Hosting)</span>
+      <span><b>Módulo:</b> Sistema Anclado</span>
+      <span><b>Duración:</b> 8 pasos</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="layout">
+
+    <nav class="toc" aria-label="Contenido">
+      <div class="toc-label">Pasos</div>
+      <ol>
+        <li><a href="#paso-1">Configura el proyecto</a></li>
+        <li><a href="#paso-2">Revisa el inventario</a></li>
+        <li><a href="#paso-3">Elige el modo de soportes</a></li>
+        <li><a href="#paso-4">Agrega tus paneles</a></li>
+        <li><a href="#paso-5">Activa extras opcionales</a></li>
+        <li><a href="#paso-6">Revisa el BOM</a></li>
+        <li><a href="#paso-7">Guarda un preset</a></li>
+        <li><a href="#paso-8">Exporta el proyecto</a></li>
+      </ol>
+    </nav>
+
+    <main>
+
+      <!-- Paso 1 ================================================= -->
+      <section class="doc-section" id="paso-1">
+        <div class="section-head"><span class="section-num">Paso 1</span><h2>Configura el proyecto</h2></div>
+        <p class="section-kicker">Antes de capturar un solo panel, dile a la herramienta con qué panel y qué riel vas a trabajar.</p>
+
+        <p>Abre el Sistema Anclado y entra a la sección <strong>Configuración</strong>. Ahí:</p>
+
+        <ol class="steps">
+          <li>Captura el <strong>nombre y la capacidad</strong> del proyecto — es lo que identifica al proyecto en pantalla y en los reportes.</li>
+          <li>Captura las medidas del <strong>panel</strong> (ancho y largo en cm) — junto con la orientación que le des después a cada arreglo, esto determina cuánto riel ocupa cada fila.</li>
+          <li>Captura el <strong>ancho de midclamp</strong>, la <strong>longitud comercial del riel</strong> (p. ej. 624 cm) y la <strong>separación máxima entre soportes</strong>.</li>
+          <li>Define el <strong>máximo de paneles por bloque</strong> antes de forzar una junta.</li>
+          <li>Revisa que los <strong>códigos de material</strong> (riel, endclamp, midclamp, splice, patas, mid support) sean los correctos — de aquí sale el nombre que verás luego en el BOM.</li>
+        </ol>
+
+        <div class="callout">
+          <span class="callout-label">Por qué importa este paso primero</span>
+          <p>Todo lo que captures más adelante (filas, arreglos, soportes) se calcula usando estos valores. Si los cambias después, el BOM se recalcula solo — pero conviene dejarlos bien definidos desde el inicio para no tener que revisar cantidades ya generadas.</p>
+        </div>
+      </section>
+
+      <!-- Paso 2 ================================================= -->
+      <section class="doc-section" id="paso-2">
+        <div class="section-head"><span class="section-num">Paso 2</span><h2>Revisa el inventario</h2></div>
+        <p class="section-kicker">El catálogo de códigos y nombres que va a aparecer en tu BOM final.</p>
+
+        <ol class="steps">
+          <li>Abre la sección <strong>Inventario</strong> (ícono de base de datos). Trae precargado el catálogo estándar de racking (endclamp, Lfoot, midclamp, neopreno, seam clamp, splice, tornillería, mid support, etc.).</li>
+          <li>Si tu almacén usa otro catálogo, usa <strong>Cargar CSV</strong> para reemplazarlo completo (columnas de código y nombre).</li>
+          <li>Confirma que los códigos que usaste en el Paso 1 existan ahí, con el nombre correcto.</li>
+        </ol>
+
+        <div class="callout warn">
+          <span class="callout-label">Importante</span>
+          <p>Si un código usado en Configuración o en Soportes no existe en el Inventario, el BOM lo va a mostrar igual, pero con el nombre genérico "Componente" en vez del nombre real. Vale la pena resolver esto antes de seguir.</p>
+        </div>
+      </section>
+
+      <!-- Paso 3 ================================================= -->
+      <section class="doc-section" id="paso-3">
+        <div class="section-head"><span class="section-num">Paso 3</span><h2>Elige el modo de soportes</h2></div>
+        <p class="section-kicker">Cómo se resuelven las patas delantera y trasera de cada línea, antes de empezar a capturar filas.</p>
+
+        <ol class="steps">
+          <li>Abre la sección <strong>Soportes</strong>.</li>
+          <li>Si tu estructura es simétrica y usa las patas estándar definidas en el Paso 1, deja el modo en <strong>Armado automático</strong> — no necesitas hacer nada más aquí.</li>
+          <li>Si la estructura no es simétrica o requiere columnas cortadas a la medida, cambia a <strong>Personalizado</strong> y captura la altura de pata trasera/delantera (en cm) y la lista de piezas de cada una (código, concepto, cantidad).</li>
+        </ol>
+
+        <p>En modo personalizado la app además genera los <strong>cortes de soporte</strong> automáticamente: cuántas piezas de cada longitud hay que cortar del riel de columna.</p>
+      </section>
+
+      <!-- Paso 4 ================================================= -->
+      <section class="doc-section" id="paso-4">
+        <div class="section-head"><span class="section-num">Paso 4</span><h2>Agrega tus paneles</h2></div>
+        <p class="section-kicker">El corazón del proyecto: convertir el plano en filas y arreglos. Hay dos formas de llegar al mismo resultado — elige una.</p>
+
+        <h3>Opción A — Capturar a mano</h3>
+        <ol class="steps">
+          <li><strong>Agregar fila</strong> — crea una nueva línea de riel independiente en el proyecto.</li>
+          <li>Dentro de la fila, <strong>agrega un arreglo</strong>: número de paneles, orientación (Portrait/Landscape) y, si aplica, formato <span class="tag">grid</span> (varias filas de panel apiladas en la misma estructura).</li>
+          <li>Ajusta lo específico de ese arreglo si lo necesitas: máximo de paneles por bloque, separación de soportes, offset entre juntas, alturas de pata individuales, si redistribuye el riel sobrante, y si lleva Mid Support (tercer punto de apoyo para paneles largos).</li>
+          <li>Repite con <strong>Agregar fila</strong> hasta cubrir todo el proyecto. Cada fila puede colapsarse desde su encabezado para mantener todo ordenado.</li>
+        </ol>
+
+        <h3>Opción B — Dibujar el plano</h3>
+        <ol class="steps">
+          <li>Haz clic en <strong>"Dibujar arreglo"</strong> para abrir el lienzo tipo CAD (zoom y paneo con scroll, arrastre o el D-pad en pantalla).</li>
+          <li>Pinta panel por panel con las herramientas <span class="tag">P</span> (Portrait) y <span class="tag">L</span> (Landscape) — las celdas contiguas del mismo tipo se agrupan automáticamente en un arreglo.</li>
+          <li>Para bloques repetitivos, usa el <strong>Sello (stamp)</strong>: coloca de un clic un bloque rectangular de filas × columnas ya definido.</li>
+          <li>Usa el <strong>Borrador</strong> para dejar pasillos o corregir el trazo.</li>
+          <li>Confirma el dibujo — la app lo traduce automáticamente en filas y arreglos reales, igual que si los hubieras capturado a mano.</li>
+        </ol>
+
+        <div class="callout">
+          <span class="callout-label">Redistribución de riel</span>
+          <p>Cuando el último tramo de riel queda muy corto, la herramienta reparte la diferencia entre los dos últimos tramos para que ambos sean utilizables, en vez de desperdiciar un recorte casi completo. Viene activada por defecto en cada arreglo (opción <span class="tag">redistribuir</span>).</p>
+        </div>
+      </section>
+
+      <!-- Paso 5 ================================================= -->
+      <section class="doc-section" id="paso-5">
+        <div class="section-head"><span class="section-num">Paso 5</span><h2>Activa extras opcionales</h2></div>
+        <p class="section-kicker">Solo si tu proyecto los necesita — de lo contrario, sáltate este paso.</p>
+
+        <div class="swrow"><div class="sw on"></div> <strong>Optimizadores de potencia</strong> — actívalos, captura la cantidad total y la lista de piezas asociadas (código y cantidad por optimizador). Se suman al BOM tal cual, sin afectar el cálculo de riel.</div>
+        <div class="swrow"><div class="sw on"></div> <strong>Contraviento</strong> — actívalo y marca qué arreglos lo llevan: longitud de larguero, cantidad de piezas y accesorios asociados. La app acumula el metraje total, lo convierte a tramos comerciales y genera su propia tabla de cortes, separada de los cortes de riel.</div>
+
+        <p>Ambos quedan apagados por defecto — si no los activas, ni siquiera aparecen en el BOM.</p>
+      </section>
+
+      <!-- Paso 6 ================================================= -->
+      <section class="doc-section" id="paso-6">
+        <div class="section-head"><span class="section-num">Paso 6</span><h2>Revisa el BOM</h2></div>
+        <p class="section-kicker">No hay botón de "calcular" — se actualiza solo en cuanto cambias cualquier dato de los pasos anteriores.</p>
+
+        <ol class="steps">
+          <li>Después de cada cambio, espera un instante — el cálculo se dispara automáticamente (con una breve pausa para no recalcular en cada tecleo).</li>
+          <li>Revisa la <strong>lista de materiales</strong>: cada código con su cantidad total consolidada.</li>
+          <li>Revisa el <strong>riel por fila</strong> (longitud frontal y trasera) y las tablas de <strong>cortes</strong> (riel, soporte y contraviento), agrupadas por longitud de pieza para la orden de corte en taller.</li>
+          <li>Revisa los <strong>splices</strong> (empalmes) calculados por cada junta interna de riel.</li>
+        </ol>
+
+        <div class="callout danger">
+          <span class="callout-label">Si el cálculo falla</span>
+          <p>Verás un aviso de error en vez de la tabla. El cálculo se hace en un servidor externo; revisa tu conexión a internet y haz un cambio más para que la app reintente.</p>
+        </div>
+      </section>
+
+      <!-- Paso 7 ================================================= -->
+      <section class="doc-section" id="paso-7">
+        <div class="section-head"><span class="section-num">Paso 7</span><h2>Guarda un preset</h2></div>
+        <p class="section-kicker">Opcional — útil si vas a repetir esta misma combinación de soportes en otro proyecto.</p>
+
+        <ol class="steps">
+          <li>Con la configuración de patas trasera/delantera del Paso 3 ya lista, guárdala como <strong>preset</strong> con un nombre propio.</li>
+          <li>El preset queda guardado en el navegador de ese equipo — no se sincroniza entre computadoras.</li>
+          <li>Si necesitas llevarlo a otro equipo, usa <strong>Exportar</strong> sobre ese preset para respaldarlo como archivo, e impórtalo después donde lo necesites.</li>
+        </ol>
+      </section>
+
+      <!-- Paso 8 ================================================= -->
+      <section class="doc-section" id="paso-8">
+        <div class="section-head"><span class="section-num">Paso 8</span><h2>Exporta el proyecto</h2></div>
+        <p class="section-kicker">El último paso: sacar tu trabajo de la herramienta.</p>
+
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th>Botón</th><th>Qué genera</th></tr></thead>
+            <tbody>
+              <tr><td class="k">Exportar BOM (CSV)</td><td>La lista de materiales calculada, lista para abrir en Excel o subir al sistema de compras.</td></tr>
+              <tr><td class="k">Exportar Proyecto</td><td>Un CSV con configuración, filas/arreglos y presets — sirve como respaldo o para pasar el proyecto a otra persona.</td></tr>
+              <tr><td class="k">Exportar PDF</td><td>Reporte con membrete de Cimiento Solar, datos del proyecto y la tabla de materiales, listo para enviar al cliente o adjuntar a la orden de compra.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Para retomar un proyecto exportado previamente, usa <span class="tag">Importar Proyecto</span> con el CSV correspondiente — restaura configuración, filas y presets sin necesidad de recapturar nada.</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<footer class="colophon">
+  <div class="wrap" style="padding:0; display:flex; justify-content:space-between; width:100%; flex-wrap:wrap; gap:10px;">
+    <span>Cimiento Solar — Manual de usuario</span>
+    <span>Generado a partir del código fuente de la aplicación</span>
+  </div>
+</footer>
+</body>
+</html>
