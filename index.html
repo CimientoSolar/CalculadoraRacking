@@ -429,6 +429,9 @@
                 <header style={{ position: 'relative', zIndex: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '32px clamp(20px, 4vw, 56px)', flexWrap: 'wrap' }}>
                     <img src="Logo cimiento solar blanco.png" alt="Cimiento Solar" style={{ height: 'clamp(76px, 8vw, 118px)', width: 'auto', objectFit: 'contain', filter: 'drop-shadow(0 12px 24px rgba(0,0,0,0.45))' }} onError={(e) => { e.target.style.display = 'none'; }} />
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        <a href="Manual.html" target="_blank" rel="noopener" style={{ padding: '10px 15px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.12)', color: '#FFFFFF', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer', backdropFilter: 'blur(12px)', textDecoration: 'none' }}>
+                            📘 Manual
+                        </a>
                         {isAdmin && (
                             <button onClick={onOpenAdmin} style={{ padding: '10px 15px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.12)', color: '#FFFFFF', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', cursor: 'pointer', backdropFilter: 'blur(12px)' }}>
                                 Usuarios
@@ -2159,6 +2162,15 @@
                                 >
                                     &#8592; Inicio
                                 </button>
+                                <a
+                                    href="Manual.html"
+                                    target="_blank"
+                                    rel="noopener"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-bold text-[#003B5C] bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                                    title="Abrir manual de usuario"
+                                >
+                                    📘 Manual
+                                </a>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
